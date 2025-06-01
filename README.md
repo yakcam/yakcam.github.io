@@ -1,2 +1,1 @@
-# yakcam.github.io
-Blog
+# blog

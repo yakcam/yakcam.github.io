@@ -1,0 +1,187 @@
+---
+layout: post
+title: 'Deploying a Hyper-V VM using Octopus – Part 2: Deploying the VM'
+date: 2018-03-17 14:40:14.000000000 +00:00
+type: post
+parent_id: '0'
+published: true
+password: ''
+status: publish
+categories:
+- DevOps
+tags:
+- HyperV
+- Powershell
+- Virtual Machines
+- Windows
+meta:
+  _thumbnail_id: '78'
+  advanced_seo_description: Using Octopus Deploy and PowerShell to create and deploy
+    a new VM.
+  _rest_api_published: '1'
+  _rest_api_client_id: "-1"
+  _publicize_job_id: '15822269222'
+  timeline_notification: '1521297615'
+author:
+  login: calummackay
+  email: wordpress@yakcam.co.uk
+  display_name: Calum Mackay
+  first_name: Calum
+  last_name: Mackay
+permalink: "/2018/03/17/deploying-a-hyper-v-vm-using-octopus-deploy-and-powershell/"
+---
+<p><!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN" "http://www.w3.org/TR/REC-html40/loose.dtd"><br />
+<html><body></p>
+<p>Welcome to part two of the series in deploying a Hyper-V VM using Octopus Deploy. In this post, I'll be taking the template VHD from part one and deploying it to a Hyper-V host using Octopus Deploy. In later parts I'll install different services, such as IIS or SQL Server, join the machine to the domain and then install an Octopus tentacle on it so that it is immediately ready to deploy applications to.</p>
+<p>Full disclosure, I had intended to get this post out last weekend, but I got completely distracted with creating a CI process for a new project we're working on; I can't say too much but we're building  a .net core app in Docker containers using TeamCity with Linux build agents, pushing that to the Azure Container Registry and from there using Octopus to deploy the container to the Web App for Containers service to run it. And breathe. Very exciting.</p>
+<h1>The Process</h1>
+<p>First of all, this is much more of a code oriented post. The PowerShell script that I'm referring to in this post is freely available here: <a href="https://github.com/yakcam/BlogScripts/blob/master/CreateVm.ps1" rel="noopener">https://github.com/yakcam/BlogScripts/blob/master/CreateVm.ps1</a></p>
+<p>You should have the following setup before going any further:</p>
+<ol>
+<li>Octopus tentacle installed, running and registered on a Hyper-V host that you'll be deploying this machine to</li>
+<li>The VHD file copied to a location that the Hyper-V service and Octopus tentacle have access to</li>
+</ol>
+<p>If you don't have the template VHD file, have a look at part one here: <a href="http://blog.yakcam.co.uk/2018/03/04/deploying-a-hyper-v-vm-using-octopus-part-1-the-template/" target="_blank" rel="noopener">Deploying a Hyper-V VM using Octopus – Part 1: The Template</a></p>
+<p>In my setup, I've got the tentacle installed on my laptop and my laptop is part of its own environment. It's got a 'Hyper-V Host' role against it and the environment is part of the 'Machine Deployment' lifecycle that I'll be using in the process I'm creating.</p>
+<p>The process that I have set up consists of just a single step, that runs against the 'Hyper-V Host' role:</p>
+<p><img class="alignnone size-full wp-image-79" src="{{site.baseurl}}/assets/2018/03/chrome_2018-03-17_12-38-55.png" alt="chrome_2018-03-17_12-38-55" width="1302" height="545"></p>
+<p>That step is just a PowerShell script step and the script is what is linked above. If you look at the script you'll see the following variables:</p>
+<div>
+<p>[code language="powershell"]<br />
+$name = $OctopusParameters["Process.MachineName"];<br />
+$switchName = $OctopusParameters["Process.SwitchName"];<br />
+$sourceTemplateVhd = $OctopusParameters["Process.SourceTemplateVhdPath"];<br />
+$destFolder = $OctopusParameters["Process.DestinationVmFolder"] + $name + '\';<br />
+$destPath = $destFolder + $name + '.vhdx';<br />
+[/code]</p>
+<p>Octopus will pass all variables into the script within the $OctopusParameters object and above you can see those being stored for later and accessed.</p>
+<p>There are a couple more variables defined against the project in Octopus as follows:</p>
+<p><img class="alignnone size-full wp-image-80" src="{{site.baseurl}}/assets/2018/03/chrome_2018-03-17_12-55-08.png" alt="chrome_2018-03-17_12-55-08.png" width="1234" height="544"></p>
+<p>The ones that are actually in use for this script are as follows:</p>
+<ul>
+<li>Process.DestinationVmFolder - The base folder of where the VM will be created. Refers to a location on or accessible to the Hyper-V host.</li>
+<li>Process.MachineName - The name given to the new VM and also what the machine is renamed to as part of the process</li>
+<li>Process.NewLocalAdminPass - The password that the 'Administrator' is given as part of the process</li>
+<li>Process.SourceTemplateVhdPath - The path of the base VHD file created in part one of this series. This must refer to a location that is accessible to the Hyper-V host.</li>
+<li>Process.SwitchName - The name of the Hyper-V switch that the VM will be connected to</li>
+<li>Process.TemplateLocaAdminPass - The password of the local administrator for the template that was set in part one of this series.</li>
+</ul>
+<p>At this point, you should have all you need to add this into Octopus and get deploying! If you want to know more about what's going on within the script, then please read on.</p>
+<h1>The Script</h1>
+<h2>Functions</h2>
+<p>Near the top of the script, you can see two (not amazingly written, I'm still learning PowerShell!) functions. the first of these is BlockUntilGuestRunning:</p>
+<p>[code language="powershell"]<br />
+function BlockUntilGuestRunning($name) {<br />
+    Write-Host "Checking status of '$name'...";<br />
+    $VM = Get-VMIntegrationService -VMName $name -Name Heartbeat;<br />
+    while ($VM.PrimaryStatusDescription -ne "OK")<br />
+    {<br />
+        $VM = Get-VMIntegrationService -VMName $name -Name Heartbeat;<br />
+        write-host "The VM is not on";<br />
+        Start-Sleep 5;<br />
+    }<br />
+    Write-Host "The VM is running.";<br />
+}<br />
+[/code]</p>
+<p>This function will keep looping until Hyper-V reports that the guest OS is running inside the VM. It writes out basic status information to try and give an idea that it hasn't frozen or something untoward hasn't happened.</p>
+<p>The second function waits until the VM has a valid, routable IPv4 address that can be used to connect to it:</p>
+</div>
+<div>
+<p>[code language="powershell"]<br />
+function BlockUntilHasIpAddress($name) {<br />
+    $ip = (Get-VM -Name $name | Select-Object -ExpandProperty NetworkAdapters).IPAddresses[0];<br />
+    while (!$ip) {<br />
+        $ip = (Get-VM -Name $name | Select-Object -ExpandProperty NetworkAdapters).IPAddresses[0];<br />
+    }<br />
+    while ($ip -eq "" -or ($ip.StartsWith("169.")) -or ($ip.StartsWith("fe80"))) {<br />
+        $ip = (Get-VM -Name $name | Select-Object -ExpandProperty NetworkAdapters).IPAddresses[0];<br />
+        Write-Host "'$ip' is not a valid ipv4 address...";<br />
+        Start-Sleep 5;<br />
+    }<br />
+    Write-Host "The VM has the ipv4 address '$ip'.";<br />
+}<br />
+[/code]</p>
+</div>
+<div>Occasionally I have observed that the above script can block forever if there's something wrong with the DHCP service on the Hyper-V switch and so it never gets a valid IPv4 address. I haven't attempted to address this because I've only ever seen it occur on my laptop and never whilst running on a server; a quick reboot of my laptop always sorted it. Again, not the most elegant code but it serves a purpose.</div>
+<div></div>
+<h2>VM Creation</h2>
+<div>
+<p>[code language="powershell"]<br />
+if (-Not (Test-Path $destFolder))<br />
+{<br />
+    mkdir $destFolder -Force &gt; $null;<br />
+}</p>
+<p>Write-Host 'Copying base vhd...';<br />
+Copy-Item `<br />
+    -Path "$sourceTemplateVhd" `<br />
+    -Destination $destPath &gt; $null;</p>
+<p>Write-Host 'Creating VM...';<br />
+New-VM `<br />
+    -Name $name `<br />
+    -MemoryStartupBytes 1GB `<br />
+    -BootDevice VHD `<br />
+    -VHDPath $destPath `<br />
+    -Path $destFolder `<br />
+    -Generation 2 `<br />
+    -Switch "$switchName" &gt; $null;<br />
+[/code]</p>
+</div>
+<div>In the first part of the script, we create a folder for the VM, copy the base VHD over to the new folder and then create a new VM using the VHD in the folder we've created. The script and Octopus process could be extended to set the startup memory from a variable.</div>
+<div></div>
+<h2>Change Local Admin Password</h2>
+<p>[code language="powershell"]<br />
+Write-Host 'Starting VM...';<br />
+Start-VM -Name $name;</p>
+<p>Write-Host 'Waiting for VM to start...';<br />
+BlockUntilGuestRunning $name;</p>
+<p>BlockUntilHasIpAddress $name;<br />
+$ip = (Get-VM -Name $name | Select-Object -ExpandProperty NetworkAdapters).IPAddresses[0];<br />
+Write-Host "VM up and has IP: $ip";</p>
+<p>Write-Host 'Adding IP to list of allowed RM clients...';<br />
+Set-Item WSMan:\localhost\Client\TrustedHosts -Value $ip -Force;</p>
+<p>$password = ConvertTo-SecureString $OctopusParameters["Process.TemplateLocalAdminPass"] -AsPlainText -Force;<br />
+$cred= New-Object System.Management.Automation.PSCredential ("Administrator", $password );</p>
+<p>Write-Host 'Connecting to remote machine...';<br />
+$s = New-PSSession -ComputerName $ip -Credential $cred;</p>
+<p>Write-Host "Changing local admin password...";<br />
+$newAdminPassword = ConvertTo-SecureString $OctopusParameters["Process.NewLocalAdminPass"]  -AsPlainText -Force;<br />
+Invoke-Command -Session $s -ScriptBlock { param($newAdminPassword) Set-LocalUser -Name "Administrator" -Password $newAdminPassword; } -ArgumentList $newAdminPassword;<br />
+[/code]</p>
+<p>One of the most important things to do after deploying our template VHd to a new VM is to change the local admin password. In the script above we start the VM, wait for it to come up and get an IPv4 address that we can use to connect to it remotely. We have to set the IP as a trusted one, note that this does require local admin/elevated permissions. We take the previous and new password provided through the variables, connect to the machine and change the password of the 'Administrator' account on the machine.</p>
+<h2>Renaming the Machine and Attaching a New Disk</h2>
+<p>[code language="powershell"]<br />
+Write-Host 'Renaming remote machine...';<br />
+Invoke-Command -Session $s -Script { param($newName) Rename-Computer -NewName $newName -Restart; } -Args $name;<br />
+Disconnect-PSSession -Session $s &gt; $null;<br />
+Remove-PSSession -Session $s &gt; $null;<br />
+Start-Sleep 5;</p>
+<p>Write-Host 'Waiting for VM to restart...';<br />
+BlockUntilGuestRunning $name;<br />
+BlockUntilHasIpAddress $name;</p>
+<p>Write-Host "Creating Octopus (D) drive...";<br />
+$diskPath = $destFolder + $name + "_D_Octopus.vhdx";<br />
+Stop-Service -Name ShellHWDetection &gt; $null;<br />
+New-VHD -Path "$diskPath" -SizeBytes 20GB `<br />
+    | Mount-VHD -Passthru `<br />
+    | Initialize-Disk -Passthru `<br />
+    | New-Partition -AssignDriveLetter -UseMaximumSize `<br />
+    | Format-Volume -FileSystem NTFS -NewFileSystemLabel "Octopus" -Confirm:$false -Force &gt; $null;<br />
+Dismount-VHD -Path "$diskPath" &gt; $null;<br />
+Start-Service -Name ShellHWDetection &gt; $null;</p>
+<p>Write-Host "Adding drive to VM...";<br />
+Add-VMHardDiskDrive -VMName "$name" -Path "$diskPath" &gt; $null;<br />
+[/code]</p>
+<p>Now we rename the machine and instruct it to reboot. We wait for it to come back up and then create a new VHD to install the Octopus tentacle on later. You may have noticed we stop and then start the 'ShellHWDetection' around creating the disk, this is to stop the irritating popup about having to format a disk when it is momentarily connected to the machine whilst it's being initialised and formatted. Lastly, that VHD is unmounted and connected to the VM.</p>
+<h2>Bring the New Drive Online</h2>
+<p>[code language="powershell"]<br />
+Write-Host 'Connecting to remote machine...';<br />
+$s2 = New-PSSession -ComputerName $ip -Credential $cred;</p>
+<p>Write-Host "Bringing drive online...";<br />
+Invoke-Command -Session $s2 -ScriptBlock { Set-Disk -Number 1 -IsOffline $false; Set-Disk -Number 1 -IsReadOnly $false; Set-Volume -DriveLetter "D" -NewFileSystemLabel "Octopus"; };</p>
+<p>Write-Host 'Complete.';<br />
+[/code]</p>
+<div>Finally, we connect the VM to bring the new drive online and assign a drive letter and label.</div>
+<div></div>
+<h1>Finished!</h1>
+<p>We now have a base VHD and we can use Octopus Deploy (or anything that can run a PowerShell script) to deploy a new VM using that VHD.</p>
+<p>As ever if you have any questions or find any issues (something that doesn't run, something you think could be improved) please let me know!</body></html></p>

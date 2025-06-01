@@ -1,0 +1,96 @@
+---
+layout: post
+title: Pi LED Status Indicators
+date: 2018-05-21 12:20:04.000000000 +01:00
+type: post
+parent_id: '0'
+published: true
+password: ''
+status: publish
+categories: []
+tags: []
+meta:
+  _thumbnail_id: '124'
+  _publicize_done_external: a:1:{s:7:"twitter";a:1:{i:19905931;s:53:"https://twitter.com/yakcam0/status/998538939672776704";}}
+  timeline_notification: '1526905207'
+  _rest_api_published: '1'
+  _rest_api_client_id: "-1"
+  _publicize_job_id: '18087528816'
+  _publicize_done_19884031: '1'
+  _wpas_done_19905931: '1'
+  publicize_twitter_user: yakcam0
+  publicize_linkedin_url: https://www.linkedin.com/updates?discuss=&scope=97114785&stype=M&topic=6404304633484845057&type=U&a=4vv3
+  _publicize_done_19884035: '1'
+  _wpas_done_19905935: '1'
+author:
+  login: calummackay
+  email: wordpress@yakcam.co.uk
+  display_name: Calum Mackay
+  first_name: Calum
+  last_name: Mackay
+permalink: "/2018/05/21/pi-led-status-indicators/"
+---
+<p><!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN" "http://www.w3.org/TR/REC-html40/loose.dtd"><br />
+<html><body></p>
+<p>At work, we run <a href="https://www.paessler.com/prtg" target="_blank" rel="noopener">PRTG</a> for our network/systems monitoring. It's a great system but I wanted something a little simpler to indicate the current status of all of our systems at a glance.</p>
+<p>I had a <a href="https://shop.pimoroni.com/collections/raspberry-pi/products/raspberry-pi-3-b-plus" target="_blank" rel="noopener">Raspberry Pi Model 3</a> and a <a href="https://shop.pimoroni.com/products/unicorn-hat" target="_blank" rel="noopener">Unicorn Hat from Pimoroni</a> lying around from some previous experiments/hacking around that I'd been doing.</p>
+<p>I wrote a simple python script that runs at startup to interrogate PRTG and change what the Unicorn Hat outputs:</p>
+<ul>
+<li>If there are 1 or more sensors down, set all the LEDs to red</li>
+<li>If we cannot communicate with PRTG, set all the LEDs to orange</li>
+<li>If there are no sensors down, set random LED to green at a random location</li>
+</ul>
+<p>The last point allows you to see that the system is still working, as every time it polls PRTG the green LED moves position.</p>
+<p>Here it is when everything's okay:</p>
+<p> </p>
+<p>[caption id="attachment_123" align="alignnone" width="1332"]<img class="alignnone size-full wp-image-123" src="{{site.baseurl}}/assets/2018/05/okay.png" alt="Okay" width="1332" height="902"> All good[/caption]</p>
+<p> </p>
+<p>And when it's not:</p>
+<p> </p>
+<p>[caption id="attachment_124" align="alignnone" width="1484"]<img class="alignnone size-full wp-image-124" src="{{site.baseurl}}/assets/2018/05/help.jpg" alt="Help" width="1484" height="995"> Help![/caption]</p>
+<p> </p>
+<p>Below is the python script I used to achieve the above. It is very simple; I do almost no python coding at all so any hints/tips are gratefully received! I'm afraid WordPress may have messed up the tabs, so I've added the file to GitHub and it can be found at the following address: <a href="https://github.com/yakcam/BlogScripts/blob/master/PRTGStatus.py" target="_blank" rel="noopener">https://github.com/yakcam/BlogScripts/blob/master/PRTGStatus.py</a></p>
+<p>[code lang="python"]<br />
+#!/usr/bin/env python</p>
+<p>from time import sleep<br />
+from random import randint<br />
+import unicornhat as unicorn<br />
+import requests</p>
+<p>def checkPrtg():<br />
+   try:<br />
+      resp = requests.get('https://YOUR_PRTG_ADDRESS_HERE/api/getstatus.htm?id=0&amp;username=YOUR_USERNAME&amp;passhash=YOUR_PASSHASH')<br />
+      if resp.status_code != 200:<br />
+         # This means something went wrong.<br />
+         return -1<br />
+      result = resp.json()<br />
+      if not result['Alarms']:<br />
+         return 0<br />
+      return result['Alarms']<br />
+   except Exception:<br />
+      return -1</p>
+<p>def setWarning():<br />
+   unicorn.brightness(1)<br />
+   unicorn.set_all(253,106,2)<br />
+   unicorn.show()</p>
+<p>def setAlert():<br />
+   unicorn.brightness(1)<br />
+   unicorn.set_all(255,0,0)<br />
+   unicorn.show()</p>
+<p>def setOkay():<br />
+   unicorn.off()<br />
+   unicorn.brightness(0.5)<br />
+   unicorn.set_pixel(randint(0, 7),randint(0, 7),0,255,0)<br />
+   unicorn.show()</p>
+<p>unicorn.set_layout(unicorn.AUTO)<br />
+unicorn.rotation(0)<br />
+unicorn.brightness(1)</p>
+<p>while True:<br />
+   alertCount = checkPrtg()<br />
+   if alertCount == -1:<br />
+      setWarning()<br />
+   elif alertCount &gt; 0:<br />
+      setAlert()<br />
+   else:<br />
+      setOkay()<br />
+   sleep(4.7)<br />
+[/code]</body></html></p>

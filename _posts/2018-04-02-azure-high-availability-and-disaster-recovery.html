@@ -1,0 +1,100 @@
+---
+layout: post
+title: 'Architecture Considerations for Azure: High Availability and Disaster Recovery'
+date: 2018-04-02 16:00:24.000000000 +01:00
+type: post
+parent_id: '0'
+published: true
+password: ''
+status: publish
+categories:
+- DevOps
+tags:
+- Azure
+- Disaster Recovery
+- High Availability
+meta:
+  _thumbnail_id: '115'
+  advanced_seo_description: You want to host a new application in the cloud but what
+    about HA and DR? I give a short overview with a focus on Azure.
+  _rest_api_published: '1'
+  _rest_api_client_id: "-1"
+  _publicize_done_external: a:1:{s:7:"twitter";a:1:{i:19905931;s:53:"https://twitter.com/yakcam0/status/980839779100217344";}}
+  _publicize_job_id: '16388328112'
+  timeline_notification: '1522685399'
+  _publicize_done_19884031: '1'
+  _wpas_done_19905931: '1'
+  publicize_twitter_user: yakcam0
+  publicize_linkedin_url: https://www.linkedin.com/updates?discuss=&scope=97114785&stype=M&topic=6386605472794976256&type=U&a=fnrD
+  _publicize_done_19884035: '1'
+  _wpas_done_19905935: '1'
+author:
+  login: calummackay
+  email: wordpress@yakcam.co.uk
+  display_name: Calum Mackay
+  first_name: Calum
+  last_name: Mackay
+permalink: "/2018/04/02/azure-high-availability-and-disaster-recovery/"
+excerpt: You've got the nod to host your first production application in someone else's
+  cloud. You've got hundreds of the things running on your own hardware right now,
+  so how hard can it be? The cloud's easy right; point and click. Now, where do I
+  find IIS in the Azure portal...
+---
+<p><!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN" "http://www.w3.org/TR/REC-html40/loose.dtd"><br />
+<html><body></p>
+<p>You've got the nod to host your first production application in someone else's cloud. You've got hundreds of the things running on your own hardware right now, so how hard can it be? The cloud's easy right; point and click. Now, where do I find IIS in the Azure portal...</p>
+<h1>Getting Started</h1>
+<p>The Azure Portal is a very simple and, in my opinion, well thought out system; though my perspective may be tainted by having had to deal with the old portal and the transition between that and the new one.</p>
+<p>When you log in, you'll see the Azure dashboard look something like the below:</p>
+<p>[caption id="attachment_109" align="alignright" width="457"]<img class="  wp-image-109 alignright" src="{{site.baseurl}}/assets/2018/04/azureportal.png" alt="AzurePortal" width="457" height="298"> The Azure Portal - Default Dashboard Homepage[/caption]</p>
+<p>And from there you can click around to your heart's content, creating anything from a new VM to a complete highly available database.</p>
+<p>Now the UI is very good and I find it can be one of the best ways to explore the capabilities of Azure and what it has to offer; it can be quite hard to get to grips with exactly what is offered by one of their products from its documentation alone and I've often found that quickly creating a throwaway resource through the portal allows me to understand the boundaries of what is on offer. Of course, the reverse can also be true; if you just click around in the UI you may never know that some products even exist or that having your service hosted outside of their recommended region pairings could result in extended downtime.</p>
+<h1>Availability</h1>
+<p>When you host anything in a third party's cloud offering you become subject to their way of doing things. For Azure and availability, one of the key things is their paired regions system.</p>
+<p>[caption id="attachment_111" align="alignnone" width="779"]<img class="alignnone size-full wp-image-111" src="{{site.baseurl}}/assets/2018/04/georegiondatacenter.png" alt="GeoRegionDataCenter" width="779" height="390"> Above image from <a href="https://docs.microsoft.com/en-us/azure/best-practices-availability-paired-regions" target="_blank" rel="noopener">https://docs.microsoft.com/en-us/azure/best-practices-availability-paired-regions</a>[/caption]</p>
+<p>Every single Azure region is part of a pair. The UK pair comprises of the UK South and UK West regions. When you create a service in Azure, it is recommended that your host that service across a paired region so that if a single region suffers a failure your service can continue, with little or no downtime, in the second region of the pair. This becomes very important if there is a prolonged and widespread outage that affects multiple paired regions; in this scenario, Microsoft will prioritise bringing back online a single region in a pair. If you didn't know this you may have used two regions, UK South and West Europe, believing that you'd be protected because they're on different continents. Unfortunately, this isn't the case and you may well suffer a longer than necessary outage because they were both the second regions in their pair to be brought online. Microsoft's documentation in this area is well worth a read if you're considering hosting a service in Azure that you or your customers have any kind of dependence on. It can be found at the link below:</p>
+<p><a href="https://docs.microsoft.com/en-us/azure/best-practices-availability-paired-regions" target="_blank" rel="noopener">https://docs.microsoft.com/en-us/azure/best-practices-availability-paired-regions</a></p>
+<p>If you've got the application in two regions then you'll need some way of directing traffic to these two regions and of course Azure has an answer for this: Azure Traffic Manager. The Azure Traffic Manager is a DNS based service that detects the health of a set of endpoints and when requested, returns the records that correspond to healthy services. For an Azure web app, this would allow you to host in multiple regions and have either an Active/Active or an Active/Passive configuration. It can also help you achieve the lowest latency or geographic routing for your service; it is the way to achieve multi-region availability with Azure hosted web apps.</p>
+<h1>Disaster Recovery</h1>
+<p>Disaster recovery is an important consideration when utilising the cloud. At what point do you declare your cloud provider a total loss and look to host elsewhere? Do you have that decision point and alternatives documented as part of your DR plan? Whilst it is very unlikely that a Company the scale of Microsoft would have long-term, broad outages, that may not be the thing that kills your cloud application stone dead. A local ISP may be unable to route traffic to Azure for most or one of your biggest customers. What happens if your account runs out of credit? How do you recover from an admin deleting the wrong resource group?</p>
+<p>In all of these cases the answer may simply be to execute your plan to manually re-host the application elsewhere; be that in your own environment or temporarily with another provider whilst you sort the mess out. With web apps, this is normally fairly simple stuff involving repointing or moving DNS records and redeploying your web application elsewhere with some minor configuration changes. As ever though, the devil is in the detail and if you haven't tested your plan out then you cannot be sure if it'll work or how long it'll take. Disaster Recovery drills are key here.</p>
+<p>If your web app relies on some kind of database backend, things start to get a little more complicated. If you're using the Azure SQL database offering, then you can easily setup things like Geo-Replication to ensure your database is replicated to another region but this isn't a DR solution. You can backup your database and copy it somewhere, but you won't be able to restore that to anything other than Azure, limiting its effectiveness as a DR solution. Again, this is something that isn't immediately obvious and where it's very easy to make an assumption about how it <em>should</em> work in theory as opposed to how it does in practice. Again, testing is key here and your DR drills should help to flush out these kinds of issues.</p>
+<h1>Putting It All Together</h1>
+<p>For an example web application that uses an Azure SQL database backend, your solution may contain the following elements:</p>
+<ul>
+<li>Web App hosted in both regions of a pair, UK South and UK West</li>
+<li>SQL database configured with geo-replication between the two regions, with automatic failover</li>
+<li>Azure Traffic Manager with each region as a single endpoint returning region based CNAME records:
+<ul>
+<li>uksouth-webapp.azurewebsites.net</li>
+<li>ukwest-webapp.azurewebsites.net</li>
+</ul>
+</li>
+<li>DNS tying it all together:
+<ul>
+<li>mywebapp.com
+<ul>
+<li>mywebapp.trafficmanager.net
+<ul>
+<li>uksouth-webapp.azurewebsites.net</li>
+<li>ukwest-webapp.azurewebsites.net</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Regular BACPAC export of the data from your Azure SQL database for DR purposes</li>
+</ul>
+<p>With all of the above, you have a good foundation for a higher availability web application whilst maintaining the ability to move elsewhere if required for disaster recovery purposes.</p>
+<h1>Further Reading &amp; References</h1>
+<p>This post was written off the back of needing to come up with a design for a scalable and repeatable web application, whilst maintaining strict control of data sovereignty, being highly available and also providing a plan should the worst happen. I found a number of good articles and link to the main ones that I used below. In some cases I found lots of great looking links that simply 404'd when I tried to visit them; a sign of how quickly this area evolves I guess.</p>
+<ul>
+<li><a href="https://docs.microsoft.com/en-us/azure/best-practices-availability-paired-regions" target="_blank" rel="noopener">https://docs.microsoft.com/en-us/azure/best-practices-availability-paired-regions</a></li>
+<li><a href="https://docs.microsoft.com/en-gb/azure/architecture/checklist/availability" target="_blank" rel="noopener">https://docs.microsoft.com/en-gb/azure/architecture/checklist/availability</a></li>
+<li><a href="https://docs.microsoft.com/en-gb/azure/architecture/checklist/resiliency" target="_blank" rel="noopener">https://docs.microsoft.com/en-gb/azure/architecture/checklist/resiliency</a></li>
+<li><a href="https://docs.microsoft.com/en-gb/azure/architecture/checklist/resiliency-per-service" target="_blank" rel="noopener">https://docs.microsoft.com/en-gb/azure/architecture/checklist/resiliency-per-service</a></li>
+<li><a href="https://docs.microsoft.com/en-us/azure/architecture/reference-architectures/app-service-web-app/multi-region" target="_blank" rel="noopener">https://docs.microsoft.com/en-us/azure/architecture/reference-architectures/app-service-web-app/multi-region</a></li>
+</ul>
+<p>Yes, they're all Microsoft links! Honestly, their documentation has come on leaps and bounds in the past few years; it is the best resource I have come across for Azure, though it can be a little light in terms of tying everything together.</p>
+<p>As ever, thanks for reading; please let me know any questions or comments you may have.</body></html></p>

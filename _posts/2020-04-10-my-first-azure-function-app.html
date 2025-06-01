@@ -1,0 +1,149 @@
+---
+layout: post
+title: My first Azure Function app
+date: 2020-04-10 15:33:20.000000000 +01:00
+type: post
+parent_id: '0'
+published: true
+password: ''
+status: publish
+categories: []
+tags:
+- Azure
+- Functions
+- Serverless
+meta:
+  _thumbnail_id: '156'
+  publicize_twitter_user: yakcam0
+  _publicize_job_id: '42865094031'
+  _coblocks_attr: ''
+  _coblocks_dimensions: ''
+  _coblocks_responsive_height: ''
+  _coblocks_accordion_ie_support: ''
+  advanced_seo_description: ''
+  amp_status: ''
+  spay_email: ''
+  timeline_notification: '1586532803'
+  _publicize_done_external: a:1:{s:7:"twitter";a:1:{i:19905931;s:54:"https://twitter.com/yakcam0/status/1248635195512717312";}}
+  _publicize_done_19884031: '1'
+  _wpas_done_19905931: '1'
+  publicize_linkedin_url: ''
+  _publicize_done_22659448: '1'
+  _wpas_done_23912086: '1'
+author:
+  login: calummackay
+  email: wordpress@yakcam.co.uk
+  display_name: Calum Mackay
+  first_name: Calum
+  last_name: Mackay
+permalink: "/2020/04/10/my-first-azure-function-app/"
+---
+<p><!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN" "http://www.w3.org/TR/REC-html40/loose.dtd"><br />
+<!-- wp:heading --><html><body></p>
+<h2>Smart Meters and Client Access Devices (CADs)</h2>
+<p><!-- /wp:heading --></p>
+<p><!-- wp:paragraph --></p>
+<p>I recently bought a(nother) gadget - the <a rel="noopener" href="https://www.hildebrand.co.uk/our-products/glow-stick-wifi-cad/" target="_blank">Glow stick Wifi CAD</a>. This device reads data from my gas &amp; electric smart meters and uploads it to the cloud, where it is available through a restful API.</p>
+<p><!-- /wp:paragraph --></p>
+<p><!-- wp:paragraph --></p>
+<p>It did take a little while for the device to be correctly paired but this was all down to one of my previous energy suppliers not following the process for a customer who leaves, so my smart meters were still 'owned' by them. Once this had been corrected the data started to flow and I pondered whether or not I'd ever have to go digging around under the spider infested staircase to get the meter readings ever again...</p>
+<p><!-- /wp:paragraph --></p>
+<p><!-- wp:paragraph --></p>
+<p>The API was very easy to get to grips with in postman and they have publicly available <a rel="noreferrer noopener" href="https://api.glowmarkt.com/api-docs/v0-1/resourcesys/" target="_blank">Swagger docs</a>. A sample gas meter reading is below:</p>
+<p><!-- /wp:paragraph --></p>
+<p><!-- wp:syntaxhighlighter/code {"language":"jscript"} --></p>
+<pre class="wp-block-syntaxhighlighter-code">{
+    "status": "OK",
+    "name": "Smart Meter, gas consumption",
+    "resourceTypeId": "672b8071-44ff-4f23-bca2-f50c6a3ddd02",
+    "resourceId": "85495519-0ad3-4743-a2b3-202f37c152ad",
+    "data": [
+        [
+            1586476916,
+            23071780
+        ]
+    ],
+    "units": "Wh",
+    "classifier": "gas.consumption"
+}</pre>
+<p><!-- /wp:syntaxhighlighter/code --></p>
+<p><!-- wp:paragraph --></p>
+<p>The usage data is contained within the "data" - the first entry is the UNIX timestamp of when the reading was taken and the second is the reading itself, in watt-hours. </p>
+<p><!-- /wp:paragraph --></p>
+<p><!-- wp:paragraph --></p>
+<p>For the electric readings the energy data is fine as it is; I have to enter my meter reading in kWh and that's what the API returns. The gas data isn't so simple; my supplier asks me to supply volume (cubic metres) readings but the API returns energy readings in watt-hours. Thankfully there is a simple equation to convert from volume to energy (available at the bottom of most gas bills) and this is what I've added to the azure function so that I can get my readings in the units I need to submit to my supplier.</p>
+<p><!-- /wp:paragraph --></p>
+<p><!-- wp:paragraph --></p>
+<p>Unfortunately, whatever values are used to calculate the energy usage are not the ones written on my bill, meaning the calculation is approximately 20 cubic metres out (at the moment). I don't know where this calculation is being done (in the smart meter, by the DCC or by Hildebrand) but because I can't access the volume data directly, it means my readings aren't quite right at the moment. I'm hopeful that the drift isn't too bad and so I could reasonably apply a static correction to get a good enough meter reading.</p>
+<p><!-- /wp:paragraph --></p>
+<p><!-- wp:heading --></p>
+<h2>Azure Functions</h2>
+<p><!-- /wp:heading --></p>
+<p><!-- wp:paragraph --></p>
+<p>I wanted something simple enough to get started with, but also very low cost to run ongoing. I didn't really want to trust my ageing unraid NAS that's gathering dust under the stairs and neither did I want to pay to continuously run a docker container or have to automate a schedule across several different products.</p>
+<p><!-- /wp:paragraph --></p>
+<p><!-- wp:paragraph --></p>
+<p>After throwing away lots of very empty solutions/projects in Visual Studio I made a little headway with Azure Functions (v3. v2 is hopelessly broken on my dev machine for some reason). The premise is simple enough, low barrier to entry serverless code execution and best of all, they have a timer based trigger, though I did have to try and make sense of the NCRONTAB based expressions they use for describing the schedule: <a href="https://docs.microsoft.com/en-us/azure/azure-functions/functions-bindings-timer?tabs=csharp#ncrontab-expressions">https://docs.microsoft.com/en-us/azure/azure-functions/functions-bindings-timer?tabs=csharp#ncrontab-expressions</a></p>
+<p><!-- /wp:paragraph --></p>
+<p><!-- wp:paragraph --></p>
+<p>All of the code is available on my GitHub: <a href="https://github.com/yakcam/BrightMeterReader">https://github.com/yakcam/BrightMeterReader</a></p>
+<p><!-- /wp:paragraph --></p>
+<p><!-- wp:paragraph --></p>
+<p>I'll need to revisit the auth token/auth system at some point. At the moment I have to manually enter a new value in to the Azure Key Vault secret that I'm using every time it expires. I'm hopeful I'll be able to make use of their oauth endpoints to get a refresh &amp; access token.</p>
+<p><!-- /wp:paragraph --></p>
+<p><!-- wp:paragraph --></p>
+<p>If you'd like to run the code locally, clone the repo and populate the local.settings.json file as below, inputting your own values for the empty ones:</p>
+<p><!-- /wp:paragraph --></p>
+<p><!-- wp:code --></p>
+<pre class="wp-block-code"><code>{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet",
+    "SlackWebhookUrl": "",
+    "GasResourceId": "",
+    "ElectricResourceId": "",
+    "BrightAuthToken": ""
+  }
+}</code></pre>
+<p><!-- /wp:code --></p>
+<p><!-- wp:paragraph --></p>
+<p>If you wish to run it on Azure, the right click publish wizard should do an adequate job of guiding you through the steps required. I've used Azure Key Vault (and a system assigned identity) to securely store secrets and make them available to the function. Links for these are available at the end.</p>
+<p><!-- /wp:paragraph --></p>
+<p><!-- wp:paragraph --></p>
+<p>I'm hoping that it'll cost very little to run, maybe only a few pence per month but time will tell; I'll certainly be keeping a very close eye on my Azure spend over the next few days! I will do my best to come back and update this post over the coming weeks with a breakdown of what it has cost to run.</p>
+<p><!-- /wp:paragraph --></p>
+<p><!-- wp:paragraph --></p>
+<p>An example of the slack output produced when the function runs can be seen below: </p>
+<p><!-- /wp:paragraph --></p>
+<p><!-- wp:image {"id":157,"sizeSlug":"large"} --></p>
+<figure class="wp-block-image size-large"><img src="{{site.baseurl}}/assets/2020/04/brightreader_slack.png" alt="" class="wp-image-157"></figure>
+<p><!-- /wp:image --></p>
+<p><!-- wp:heading --></p>
+<h2>Automated meter reading submission?</h2>
+<p><!-- /wp:heading --></p>
+<p><!-- wp:paragraph --></p>
+<p>Whilst my energy supplier don't advertise the fact that they have an API, a quick look at the interactions in the developer console shows that there's potentially a restful API behind the scenes, which might be used to automate the submission process... Of course if the UK's smart meter roll-out had been better executed (I'm not sure how it could have been done any worse) then all of this would be unnecessary!</p>
+<p><!-- /wp:paragraph --></p>
+<p><!-- wp:heading --></p>
+<h2>Links</h2>
+<p><!-- /wp:heading --></p>
+<p><!-- wp:paragraph --></p>
+<p>Azure Functions getting started using Visual Studio: <a href="https://docs.microsoft.com/en-us/azure/azure-functions/functions-create-your-first-function-visual-studio">https://docs.microsoft.com/en-us/azure/azure-functions/functions-create-your-first-function-visual-studio</a></p>
+<p><!-- /wp:paragraph --></p>
+<p><!-- wp:paragraph --></p>
+<p>Timer triggers for Azure Functions: <a href="https://docs.microsoft.com/en-us/azure/azure-functions/functions-bindings-timer?tabs=csharp">https://docs.microsoft.com/en-us/azure/azure-functions/functions-bindings-timer?tabs=csharp</a></p>
+<p><!-- /wp:paragraph --></p>
+<p><!-- wp:paragraph --></p>
+<p>Azure Functions and Azure Key Vault: <a href="https://azure.microsoft.com/en-us/blog/simplifying-security-for-serverless-and-web-apps-with-azure-functions-and-app-service/">https://azure.microsoft.com/en-us/blog/simplifying-security-for-serverless-and-web-apps-with-azure-functions-and-app-service/</a></p>
+<p><!-- /wp:paragraph --></p>
+<p><!-- wp:heading --></p>
+<h2>Update - 18/04/2020 - Costs and Token Refresh</h2>
+<p><!-- /wp:heading --></p>
+<p><!-- wp:paragraph --></p>
+<p>The meter reading function has been running once a day for about a week now and I can't actually see any additional costs on my bill! Looking at the <a rel="noreferrer noopener" href="https://azure.microsoft.com/en-gb/pricing/details/functions/" target="_blank">free limits</a> I don't think I'll be coming anywhere close to them.</p>
+<p><!-- /wp:paragraph --></p>
+<p><!-- wp:paragraph --></p>
+<p>I've added a SetToken function which is run once an hour. This checks the current token to see if it expires within the next 2 days and if it does, it will go and fetch new one and save it to Azure Key Vault.</p>
+<p><!-- /wp:paragraph --><br />
+</body></html></p>

@@ -1,0 +1,160 @@
+---
+layout: post
+title: 'Deploying a Hyper-V VM using Octopus - Part 1: The Template'
+date: 2018-03-04 17:03:22.000000000 +00:00
+type: post
+parent_id: '0'
+published: true
+password: ''
+status: publish
+categories:
+- DevOps
+tags:
+- HyperV
+- Powershell
+- Sysprep
+- Virtual Machines
+- Windows
+meta:
+  _thumbnail_id: '75'
+  _rest_api_published: '1'
+  _rest_api_client_id: "-1"
+  advanced_seo_description: How to deploy a new Hyper-V Virtual Machine using PowerShell
+    and Octopus Deploy.
+  timeline_notification: '1520183006'
+  _publicize_job_id: '15374713493'
+author:
+  login: calummackay
+  email: wordpress@yakcam.co.uk
+  display_name: Calum Mackay
+  first_name: Calum
+  last_name: Mackay
+permalink: "/2018/03/04/deploying-a-hyper-v-vm-using-octopus-part-1-the-template/"
+---
+<p><!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN" "http://www.w3.org/TR/REC-html40/loose.dtd"><br />
+<html><body></p>
+<p>This is the first in a multi-part series of deploying a new Hyper-V Virtual Machine (VM) using Octopus where I'll go through how to create new VMs for dev/test purposes. By the end of the series, we'll have created a project in Octopus that will allow us to create a (domain joined) IIS VM or a SQL Server VM on any Hyper-V host.</p>
+<p>In this post, we'll go through creating a new VM, installing any pre-requisites we need on the machine, sysprepping it and finally exporting it to capture the virtual hard disk file we'll need for later.</p>
+<p>First of all, I'm using my laptop for this (Win 10 Pro) and so I need to ensure that I have Hyper-V installed locally, though you could of course use whatever Hyper-V server you have access to. Also, you will need local admin rights on whichever machine you do this on. On Win 10 Pro, you can install Hyper-V through the control panel. Open an explorer window and put the following in the path:</p>
+<blockquote><p>Control Panel\All Control Panel Items\Programs and Features</p></blockquote>
+<p>You should end up with the following 'Programs and Features' window and can then click on 'Turn Windows features on or off':</p>
+<p><img class="alignnone size-full wp-image-48" src="{{site.baseurl}}/assets/2018/03/explorer_2018-03-04_08-55-36.png" alt="explorer_2018-03-04_08-55-36" width="564" height="249"></p>
+<p>Which will bring up the 'Windows Features' dialog and allow you to select 'Hyper-V':</p>
+<p><img class="alignnone size-full wp-image-49" src="{{site.baseurl}}/assets/2018/03/optionalfeatures_2018-03-04_08-57-40.png" alt="OptionalFeatures_2018-03-04_08-57-40" width="415" height="368"></p>
+<p>Click 'OK' and the install will start.</p>
+<p>Once that's all done, you should now have access to the 'Hyper-V Manager' which should look something like this (minus the two VMs I already have there):</p>
+<p><img class="alignnone size-full wp-image-50" src="{{site.baseurl}}/assets/2018/03/mmc_2018-03-04_09-01-27.png" alt="mmc_2018-03-04_09-01-27" width="1029" height="578"></p>
+<p>Before we create our VM, we need to download an Operating System installer disk and for this, I'll be using Server 2016 (Core/Without Desktop Experience). Next select 'New' --&gt; 'Virtual Machine' from the 'Actions' menu on the right-hand side of Hyper-V Manager.</p>
+<p>Click Next on the first page of the wizard and then enter a name for the virtual machine and go to the next screen. Here I'm using 'W2K16Template' for the VM name:</p>
+<p><img class="alignnone size-full wp-image-51" src="{{site.baseurl}}/assets/2018/03/mmc_2018-03-04_09-09-04.png" alt="mmc_2018-03-04_09-09-04" width="704" height="533"></p>
+<p>Here I'll select 'Generation 2' because I have no requirements for backwards compatibility with previous versions of Hyper-V:</p>
+<p><img class="alignnone size-full wp-image-52" src="{{site.baseurl}}/assets/2018/03/mmc_2018-03-04_09-10-55.png" alt="mmc_2018-03-04_09-10-55" width="704" height="533"></p>
+<p>Next, I'll set the startup memory to 1024MB. Server 2016 only has a requirement for 512MB, but for install it requires 800MB and I find it sluggish with anything less than 1GB.</p>
+<p><img class="alignnone size-full wp-image-53" src="{{site.baseurl}}/assets/2018/03/mmc_2018-03-04_09-13-22.png" alt="mmc_2018-03-04_09-13-22" width="704" height="533"></p>
+<p>Select the switch you want to connect the machine to on the next screen; 'Default Switch' which comes installed with Hyper-V will be fine for our purposes and go onto the next screen.</p>
+<p><img class="alignnone size-full wp-image-54" src="{{site.baseurl}}/assets/2018/03/mmc_2018-03-04_09-17-18.png" alt="mmc_2018-03-04_09-17-18" width="704" height="533"></p>
+<p>Set the size of the disk to a suitable number; here I'm using 64GB because these machines never have anything but the OS installed on the C drive and that seems to give enough space for a few years of regular patching. Though these machines are unlikely to be so long lived. If you don't have 64GB available, don't worry, this disk only takes up space used by default; it doesn't provision the whole 64GB when it's created.</p>
+<p><img class="alignnone size-full wp-image-55" src="{{site.baseurl}}/assets/2018/03/mmc_2018-03-04_09-18-06.png" alt="mmc_2018-03-04_09-18-06" width="704" height="533"></p>
+<p>Now we'll select to boot the machine from the .iso file that we downloaded earlier:</p>
+<p><img class="alignnone size-full wp-image-56" src="{{site.baseurl}}/assets/2018/03/mmc_2018-03-04_09-21-35.png" alt="mmc_2018-03-04_09-21-35" width="704" height="533"></p>
+<p>Finally, we can click 'Finish' and the VM will be created for us.</p>
+<p>Select the VM in the manager window and click 'Start' from the actions menu. Now click 'Connect' from the actions menu. A console window should appear and the VM will have booted into the OS install disk. Following these steps through the OS install will get the install going for Server 2016 without a GUI, i.e. Core/No desktop experience:</p>
+<ol>
+<li>Select your language preferences</li>
+<li>Install</li>
+<li>Don't enter a product key at this point, just click on the 'I don't have a product key' text at the bottom of the screen</li>
+<li>Select 'Windows Server 2016 Standard' and click next</li>
+<li>Read and accept the licence terms if you're happy with them</li>
+<li>Click 'Custom: Install Windows only (advanced)'</li>
+<li>Ensure 'Drive 0 Unallocated Space' is selected and click next</li>
+<li>The windows install will begin.</li>
+</ol>
+<p>Now is probably a good time to grab a break whilst the OS installs.</p>
+<p>Once the install and all the reboots have completed, you should get a command prompt that looks like the below:</p>
+<p><img class="alignnone size-full wp-image-57" src="{{site.baseurl}}/assets/2018/03/vmconnect_2018-03-04_09-48-52.png" alt="vmconnect_2018-03-04_09-48-52" width="656" height="337"></p>
+<p>Reset the password and enjoy using the keyboard to get around your brand new server! Once the admin password has been reset, you'll be logged in and dropped into a command prompt window.</p>
+<p>Next, we need to enable remote management so that we can easily copy files over and manage the machine remotely later. First, start PowerShell:</p>
+<p>[code language="bash"]<br />
+powershell<br />
+[/code]</p>
+<p>And now run the following two commands:</p>
+<p>[code language="powershell"]<br />
+Enable-PSRemoting -Force;<br />
+winrm quickconfig;<br />
+[/code]</p>
+<p>The first command should return no output and the second one should ask you if you wish to make changes to allow remote management, leaving the console window looking something like the below:</p>
+<p><img class="alignnone size-full wp-image-67" src="{{site.baseurl}}/assets/2018/03/vmconnect_2018-03-04_10-41-05.png" alt="vmconnect_2018-03-04_10-41-05" width="991" height="514"></p>
+<p>Now we can attempt to connect to our VM remotely using the following script, simply substitute in the correct name of the VM into the $vmName variable and change the local admin password for the VM:</p>
+<p>[code language="powershell"]<br />
+# Enter your VM name here<br />
+$vmName = "W2k16Template";</p>
+<p># Enter the local admin password for the VM below<br />
+$localAdminPassword = "Your_Local_Admin_Password_Here";</p>
+<p># Get the IP address of the machine<br />
+$ip = (Get-VM -Name $vmName | Select-Object -ExpandProperty NetworkAdapters).IPAddresses[0]; # Not great, but it seems to do the trick<br />
+Write-Host "VM IP: $ip";</p>
+<p># Add the IP of the VM to those that we're allowed to remotely manage<br />
+# NB. This will clear out any existing entries<br />
+Write-Host "Adding IP to list of allowed RM clients...";<br />
+Get-Service winrm | Start-Service; # Start the WinRM service<br />
+Set-Item WSMan:\localhost\Client\TrustedHosts -Value $ip -Force;</p>
+<p># Create the credentials for the session<br />
+$password = ConvertTo-SecureString "$localAdminPassword" -AsPlainText -Force;<br />
+$cred= New-Object System.Management.Automation.PSCredential ("Administrator", $password );</p>
+<p># Create a new remote session<br />
+Write-Host "Connecting to remote machine...";<br />
+$s = New-PSSession -ComputerName $ip -Credential $cred;</p>
+<p># Connect to the machine and run a command to prove it's working<br />
+Invoke-Command -Session $s -ScriptBlock { whoami };<br />
+[/code]</p>
+<p>When run and successful, the above script should output the username of the local administrator in the new VM.</p>
+<p>Next, we need to copy over any installer files we want to have available on the disk. For my purposes, I want SQL Server, Octopus Deploy Tentacle and Redgate's DLM Automation installer. I also need a certificate for the Octopus Tentacle, but I'll get onto why in a later post. I've put all of the files into:</p>
+<pre>C:\InstallFiles</pre>
+<p><img class="alignnone size-full wp-image-71" src="{{site.baseurl}}/assets/2018/03/powershell_ise_2018-03-04_11-13-30.png" alt="powershell_ise_2018-03-04_11-13-30" width="669" height="189"></p>
+<p>So let's copy all of these files into the same directory in the new VM using the following script which assumes the session from earlier is still open and available:</p>
+<p>[code language="powershell"]<br />
+Invoke-Command -Session $s -ScriptBlock { mkdir C:\InstallFiles };<br />
+Copy-Item -ToSession $s -Path "C:\installfiles\Octopus.Tentacle.3.16.3-x64.msi" -Destination "C:\installfiles\OctopusTentacleInstaller.msi"<br />
+Copy-Item -ToSession $s -Path "C:\installfiles\SQLServer2017-SSEI-Dev.exe" -Destination "C:\installfiles\SQLServerInstaller.exe"<br />
+Copy-Item -ToSession $s -Path "C:\installfiles\DLMAutomation.exe" -Destination "C:\installfiles\DLMAutomation.exe"<br />
+Copy-Item -ToSession $s -Path "C:\installfiles\octocert.txt" -Destination "C:\installfiles\octocert.txt"<br />
+[/code]</p>
+<p>You'll notice I rename the installer files when I copy them so that if the version number or names change later I don't have to change any downstream scripts that run them.</p>
+<p>At this point, you may choose to install IIS or prepare an installation of SQL server. I'm not because I want a very generic base image, that can be customised later on by the octopus process. Both approaches have their pros and cons, though if you do install or prepare your IIS or SQL server installs now, you are guaranteed that version when it runs; something that may be useful if you're going to use this process to create production machines. Equally, you may wish to create a generic base image and then from that create more specific images using a build server.</p>
+<p>However, for me, the next step is to sysprep the machine before we template it. Running sysprep on a machine resets the machine such that it can be copied and deployed as many times as you wish without any issues (such as duplicate SIDs). We're going to make use of an answer file to provide a product key and default local administrator password, so that as soon as the machine is deployed we can connect to it remotely without any manual intervention.</p>
+<p>A sample answer file can be downloaded from here: <a href="https://manage-docs.citrix.com/hc/en-us/articles/212714603-Prepare-Windows-Server-VM-templates-for-deploying-blueprints#sysprep" target="_blank" rel="noopener">https://manage-docs.citrix.com/hc/en-us/articles/212714603-Prepare-Windows-Server-VM-templates-for-deploying-blueprints#sysprep</a></p>
+<p>The above link also contains some useful steps for actually running the sysprep process for multiple target types. The unattend.xml file will need to have the following sections modified:</p>
+<p>[code language="xml"]<br />
+&lt;ComputerName&gt;*&lt;/ComputerName&gt;<br />
+&lt;ProductKey&gt;YOUR PRODUCT KEY HERE&lt;/ProductKey&gt;<br />
+&lt;RegisteredOrganization&gt;YOUR ORGANIZATION NAME HERE&lt;/RegisteredOrganization&gt;<br />
+&lt;RegisteredOwner&gt;YOUR REGISTERED OWNER HERE&lt;/RegisteredOwner&gt;<br />
+[/code]</p>
+<p>Leaving the 'ComputerName' node with '*' will cause a new name to be auto-generated.</p>
+<p>[code language="xml"]<br />
+&lt;AdministratorPassword&gt;<br />
+&lt;Value&gt;DEFAULT_LOCAL_ADMIN_PASSWORD&lt;/Value&gt;<br />
+&lt;PlainText&gt;true&lt;/PlainText&gt;<br />
+&lt;/AdministratorPassword&gt;<br />
+[/code]</p>
+<p>And the above will set the default admin password for you so you can avoid any manual intervention. As before, we need to copy the answer to the VM so that it can be used by sysprep; I've placed it into a folder named 'unattend' on the c: drive.</p>
+<p>[code language="powershell"]<br />
+Invoke-Command -Session $s -ScriptBlock { mkdir C:\unattend };<br />
+Copy-Item -ToSession $s -Path "C:\unattend\unattend.xml" -Destination "C:\unattend\unattend.xml";<br />
+[/code]</p>
+<p>At this point, if I were building this process for production or end-user machines, I'd add an extra script file to ensure that the unattend.xml file was deleted before anyone could access it. We really want to prevent people from accessing product keys, default admin passwords etc... Though as this is specifically for a dev/test VM, I'm not going to go through that process here.</p>
+<p>We've now completed all of our prep work and can <i>finally </i>run the sysprep process. I find that it's easier to actually log in to the VM and use the console directly for this step because I can see the sysprep dialog and watch the machine go for its shutdown.</p>
+<p>Once you're logged in, run the following:</p>
+<p>[code language="bash"]<br />
+c:\Windows\System32\Sysprep\sysprep.exe /generalize /shutdown /oobe /unattend:c:\unattend\unattend.xml<br />
+[/code]</p>
+<p>And when that's completed, the VM will shut down and you're ready to export it. Simply run the following PowerShell to achieve this:</p>
+<p>[code language="powershell"]<br />
+Export-VM -Name "$vmName" -Path "C:\ExportedVirtualMachines";<br />
+[/code]</p>
+<p>You'll now be able to find the .vhdx file you'll need for part 2 at the following location:</p>
+<pre>C:\ExportedVirtualMachines\W2K16Template\Virtual Hard Disks\w2k16template.vhdx</pre>
+<p>The full PowerShell script file including everything above can be found on GitHub here: <a href="https://github.com/yakcam/BlogScripts/blob/master/CreateTemplateVM.ps1" target="_blank" rel="noopener">https://github.com/yakcam/BlogScripts/blob/master/CreateTemplateVM.ps1</a></p>
+<p>If you are going to use that .vhdx file straight away, please please please, as soon as you start the VM up, change the local admin password to something secure and unique.</p>
+<p>As ever, if you have any issues please don't hesitate to get in touch via the comments below or on Twitter. I'm also on the SQL Community slack channel - more details here: <a href="https://sqlslack.com/" target="_blank" rel="noopener">https://sqlslack.com/</a></p>
+<p> </body></html></p>

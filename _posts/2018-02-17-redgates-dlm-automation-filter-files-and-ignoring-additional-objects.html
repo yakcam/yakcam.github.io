@@ -1,0 +1,50 @@
+---
+layout: post
+title: Redgate's DLM Automation, filter files and ignoring additional objects
+date: 2018-02-17 14:08:48.000000000 +00:00
+type: post
+parent_id: '0'
+published: true
+password: ''
+status: publish
+categories:
+- Database
+- DevOps
+tags: []
+meta:
+  _rest_api_published: '1'
+  _rest_api_client_id: "-1"
+  _publicize_job_id: '14842033023'
+  timeline_notification: '1518876529'
+author:
+  login: calummackay
+  email: wordpress@yakcam.co.uk
+  display_name: Calum Mackay
+  first_name: Calum
+  last_name: Mackay
+permalink: "/2018/02/17/redgates-dlm-automation-filter-files-and-ignoring-additional-objects/"
+---
+<p><!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN" "http://www.w3.org/TR/REC-html40/loose.dtd"><br />
+<html><body></p>
+<p>I've had an issue with our database deployments for a while now. We need to be able to deploy our database, ignoring certain tables because they're modified by the application on the fly and also ignoring any additional objects (customisations) that may have been created in the database for that specific customer. We know the names (or at least the pattern) of tables to ignore for updates. We don't know the name or schemas of any additional objects ahead of time.</p>
+<p>Our database is built by TeamCity using Redgate's DLM Automation tools and this outputs our database as a lovely bundle of NuGet'y goodness. From there, the NuGet package is pushed to Octopus and available to be deployed. In Octopus we use a (slightly modified) <a href="http://library.octopusdeploy.com/step-templates/19f750fb-2ce8-4361-859e-2dfcdf08a952/actiontemplate-redgate-deploy-from-package" target="_blank" rel="noopener">Deploy From Package</a> step template to deploy the database. The modification allows us to pass the -IgnoreAdditional switch to the DLM Automation cmdlets.</p>
+<p>[caption id="attachment_41" align="alignnone" width="1064"]<img class="alignnone size-full wp-image-41" src="{{site.baseurl}}/assets/2018/02/image-e1518875352144.png" alt="DLmAutomationIssue" width="1064" height="129"> The error you'll receive if you combine the -IgnoreAdditional and -FilterPath switches[/caption]</p>
+<p> </p>
+<p>After a little experimentation, some mild frustration and a support call, I found that you cannot combine the -IgnoreAdditional and -FilterPath switches when using the New-DlmDatabaseRelease cmdlet... From Redgate's help site:</p>
+<blockquote>
+<h3 id="New-DlmDatabaseRelease--IgnoreAdditional&lt;System.Management.Automation.SwitchParameter&gt;" style="box-sizing:inherit;margin:0 0 10px;padding:0;font-size:1.125rem;line-height:28px;font-weight:500;color:#222222;font-family:Roboto, 'Helvetica Neue', Arial, sans-serif;font-style:normal;font-variant-ligatures:normal;font-variant-caps:normal;letter-spacing:normal;orphans:2;text-align:start;text-indent:0;text-transform:none;white-space:normal;widows:2;word-spacing:0;background-color:#ffffff;text-decoration-style:initial;text-decoration-color:initial;"><code>-IgnoreAdditional &lt;System.Management.Automation.SwitchParameter&gt;</code></h3>
+<p>Specifies whether to ignore additional objects in the target database. Enabling this prevents new and unexpected objects in the target being dropped - note that the checks and tests applied to this database may not have taken those objects into account and may therefore not be valid.</p>
+<p><em><strong>This parameter can't be used simultaneously with filter files.</strong></em>
+</p></blockquote>
+<p><a href="https://documentation.red-gate.com/dlma2/cmdlet-reference/new-dlmdatabaserelease" target="_blank" rel="noopener">https://documentation.red-gate.com/dlma2/cmdlet-reference/new-dlmdatabaserelease</a></p>
+<p>The bold and italic is a relatively recent update to the help site following our support call mentioned above; unfortunately, it looks like it's not going to be supported in the near future.</p>
+<p>What I've got working is as follows:</p>
+<ol>
+<li>Create a new, empty database</li>
+<li>Deploy the database, using the filter file, to the database created in step 1 - using the Deploy From Package step template</li>
+<li>Deploy from the database in step 1, to the final target database, ignoring additional objects - using the Deploy From Database step template</li>
+<li>Drop the database from step 1</li>
+</ol>
+<p>I haven't yet experimented with any of the other cmdlets to see if this could be achieved without an intermediate database. If anyone out there has managed to, please let me know; I'd be interested to hear how you solved the problem. Of course one of the downsides of this approach is that you're doing two full comparisons, so it takes almost twice as long.</p>
+<p>NB. This is my first ever SQL blog post so if you've got any comments or suggestions, please let me know :)</p>
+<p> </body></html></p>

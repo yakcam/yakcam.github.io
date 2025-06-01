@@ -1,0 +1,45 @@
+---
+layout: post
+title: Automated Build &amp; Deployment for Legacy Databases
+date:
+type: post
+parent_id: '0'
+published: false
+password: ''
+status: draft
+categories:
+- Database
+- DevOps
+tags: []
+meta:
+  _thumbnail_id: '29'
+author:
+  login: calummackay
+  email: wordpress@yakcam.co.uk
+  display_name: Calum Mackay
+  first_name: Calum
+  last_name: Mackay
+permalink: "/"
+---
+<p><!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN" "http://www.w3.org/TR/REC-html40/loose.dtd"><br />
+<html><body><br />
+<em>The image <a href="https://www.flickr.com/photos/sparker/61359364">“Mag tape drive”</a> by <i><a href="https://www.flickr.com/people/sparker/">Steve Parker</a> </i>is licensed under <a href="https://creativecommons.org/licenses/by/2.0">CC BY 2.0</a></em></p>
+<blockquote><p>We have to be able to deploy it automatically</p></blockquote>
+<p>At the core of one of our products is a database that, in one form or another, has been around for about 15 years.</p>
+<p>Over the past few years, we've been trying to improve the way we work with, develop and deploy it. There are a number of tools for source controlling, differencing and deploying SQL databases, but we've settled on Redgate's SQL toolbelt which includes, amongst other things, SQL Source Control and DLM Automation.</p>
+<p>Summarised, the original process was something like the below:</p>
+<ol>
+<li>Numbered database scripts checked into source control.</li>
+<li>When an update was required, we'd diff between two sets of files and manually create a change script that was run by the update process.</li>
+<li>Project consultants can make changes to a customers database to support specific custom work; these go into a customer's specific repository but do not modify the source controlled code from 1.</li>
+<li>The application can dynamically add fields and tables to allow a customer to have additional fields in their system.</li>
+</ol>
+<p>All of this adds up to something that doesn't follow an idealised CD process for a database. I haven't been able to find a single solitary post from someone doing something similar with Redgate's (or anyone else's) tools. You may be thinking that if no one's writing about it, perhaps it isn't a good idea? I've had the same thought myself, more than once, but believe that we can come up with a system that allows us to solve the problem sensibly and responsibly. Of course, time will tell, but we have customers and a business that needs us to solve this problem.</p>
+<p>Therefore, an outline list of requirements is as follows:</p>
+<ol>
+<li>A database that can be deployed without any human intervention, without wiping out any customisations</li>
+<li>The ability for a project consultant and/or an application to add new objects to a database without them being wiped out by the next deployment</li>
+<li>The ability to source control database customisations such that they can be deployed without any human intervention, without wiping out any of the core databases code</li>
+</ol>
+<p> </p>
+<p> </body></html></p>
